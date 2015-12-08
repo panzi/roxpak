@@ -1,11 +1,12 @@
 roxpak
 ======
 
-Unpack, list and mount RoX game archives. See: http://www.autofish.net/shrines/rox/
+List, pack, unpack and mount [RoX](http://www.autofish.net/shrines/rox/) game archives.
 
 Basic usage:
 
 	roxpak.py list <archive>                 - list contens of .pak archive
+	roxpak.py pack <archive> [files...]      - create a new .pak archive
 	roxpak.py unpack <archive>               - extract .pak archive
 	roxpak.py mount <archive> <mount-point>  - mount archive as read-only file system
 
@@ -17,11 +18,7 @@ This script is compatible with Python 2.7 and 3 (tested with 2.7.5 and 3.3.2).
 File Format
 -----------
 
-Enough of the file format is reverse engineered to dump the packed files, but
-there are some fields that I don't know what they do.
-
 Number encoding: Little Endian
-
 
 	┌──────────────────────────────┐
 	│                              │
@@ -59,7 +56,7 @@ Number encoding: Little Endian
 If you create an alternative archive where for each record only the size (or
 some other 32 bit value), the name as ASCII (1 byte per character, no NIL
 character) and the file data is included, then `O[i]` gives the offset for
-record `i` (`O[0] = 0` given that the first record has `i = 1`).
+record `i` (`O[0] = 0`).
 
 Maybe the file data is read into memory in such a way that this value can be
 used to lookup the records?

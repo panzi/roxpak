@@ -126,6 +126,13 @@ def read_index(stream):
 	end = stream.tell()
 	if offset < end:
 		raise IOError("unexpected trailing %u byte(s)" % (end - offset))
+
+def pack(stream,dirname,callback=lambda name: None):
+	files = []
+	for dirpath, dirnames, filenames in os.walk(dirname):
+		for filename in filenames:
+			files.append(os.path.join(dirpath,filename))
+	_pack_files(stream,files,callback)
 		
 def unpack(stream,outdir=".",callback=lambda name: None):
 	for name, offset, size in read_index(stream):
@@ -144,7 +151,55 @@ def unpack_file(stream,name,offset,size,outdir=".",callback=lambda name: None):
 	callback(name)
 	with open(name,"wb") as fp:
 		sendfile(fp,stream,offset,size)
-		
+
+def pack_buffers(stream,buffers,callback=lambda name: None):
+	stream.write(struct.pack("<I",len(buffers)))
+	for name, data in sorted(buffers,key=lambda item: item[0]):
+		callback(name)
+		write_entry_header(stream,name,len(data))
+		stream.write(data)
+
+def write_entry_header(stream,name,size,last_packed_offset):
+	name = name.replace(os.path.sep,"\\").encode("latin1")
+	namelen = len(name)
+	namebuf = bytearray(3 * namelen)
+	for i in xrange(namelen):
+		j = 3 * i
+		namebuf[j  ] = 1
+		namebuf[j+1] = 0
+		namebuf[j+2] = name[i]
+
+	packed_offset = last_packed_offset + namelen + size + 4
+
+	stream.write(struct.pack("<IIBB",packed_offset,len(name),0,0))
+	stream.write(namebuf)
+	stream.write(struct.pack("<I",size))
+	return packed_offset
+
+def pack_files(stream,files_or_dirs,callback=lambda name: None):
+	files = []
+	for name in files_or_dirs:
+		if os.path.isdir(name):
+			for dirpath, dirnames, filenames in os.walk(name):
+				for filename in filenames:
+					files.append(os.path.join(dirpath,filename))
+		else:
+			files.append(name)
+	_pack_files(stream,files,callback)
+
+def _pack_files(stream,files,callback=lambda name: None):
+	files.sort()
+	stream.write(struct.pack("<I",len(files)))
+	packed_offset = 0
+	for name in files:
+		with open(name,"rb") as infile:
+			infile.seek(0,2)
+			size = infile.tell()
+			callback(name)
+			packed_offset = write_entry_header(stream,name,size,packed_offset)
+			sendfile(stream,infile,0,size)
+			stream.write(b'\0')
+
 def human_size(size):
 	if size < 2 ** 10:
 		return str(size)
@@ -604,11 +659,16 @@ def main(argv):
 
 			return parser
 
-	parser = argparse.ArgumentParser(description='unpack, list and mount RoX .pak archives')
+	parser = argparse.ArgumentParser(description='pack, unpack, list and mount RoX .pak archives')
 	parser.register('action', 'parsers', AliasedSubParsersAction)
 	parser.set_defaults(print0=False,verbose=False)
 
 	subparsers = parser.add_subparsers(metavar='command')
+
+	pack_parser = subparsers.add_parser('pack',aliases=('c',),help="pack archive")
+	pack_parser.set_defaults(command='pack')
+	add_common_args(pack_parser)
+	pack_parser.add_argument('files', metavar='file', nargs='*', help='files and directories to pack')
 
 	unpack_parser = subparsers.add_parser('unpack',aliases=('x',),help='unpack archive')
 	unpack_parser.set_defaults(command='unpack')
@@ -656,6 +716,10 @@ def main(argv):
 				unpack_files(stream,set(name.strip(os.path.sep) for name in args.files),args.dir,callback)
 			else:
 				unpack(stream,args.dir,callback)
+
+	elif args.command == 'pack':
+		with open(args.archive,"wb") as stream:
+			pack_files(stream,args.files or ['.'],callback)
 	
 	elif args.command == 'mount':
 		if not HAS_LLFUSE:
