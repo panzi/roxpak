@@ -49,7 +49,7 @@ Number encoding: Little Endian
 
 	Offset  Size  Type        Description
 	     0     4  uint32_t    number of entries (N)
-		 1   N/A  Entry[N]    entries
+	     1   N/A  Entry[N]    entries
 
 ### Entry
 
@@ -70,10 +70,10 @@ the actual chracter in ASCII. There is no terminating NIL character.
 	         4     4  uint32_t    file name length (N)
 	         8     1  byte        always zero
 	         9     1  byte        always zero
-	        10     N  byte[N*3]   file name (no NIL byte)
-	  10+N*3+1     4  uint32_t    file size (S)
-      10+N*3+5     S  uint8_t[S]  file data
-	10+N*3+5+S     1  byte        always zero (terminator?)
+	        10   N*3  byte[N][3]  file name (no NIL byte)
+	    10+N*3     4  uint32_t    file size (S)
+	  10+N*3+4     S  uint8_t[S]  file data
+	10+N*3+4+S     1  byte        always zero (terminator?)
 
 Related Projects
 ----------------
