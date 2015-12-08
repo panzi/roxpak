@@ -77,18 +77,19 @@ def read_index(stream):
 
 	filecount, = struct.unpack("<I",hdr)
 	i = 0
+	last_packed_offset = 0
 	while i < filecount:
 		record = stream.read(10)
 		if len(record) < 10:
-			raise IOError("unexpected end of file while reading file size")
-		unknown1, namelen, unknown2 = struct.unpack('<IIH',record)
-		if unknown2 != 0:
-			raise IOError("last two bytes of record %d are not zero" % i)
+			raise IOError("record %d: unexpected end of file while reading file size" % i)
+		packed_offset, namelen, zero = struct.unpack('<IIH',record)
+		if zero != 0:
+			raise IOError("record %d: last two bytes of record %d are not zero" % i)
 
 		namebytelen = 3 * namelen
 		name = stream.read(namebytelen)
 		if len(name) != namebytelen:
-			raise IOError("unexpected end of file while reading file size")
+			raise IOError("record %d: unexpected end of file while reading file size" % i)
 
 		namebuf = []
 		for j in xrange(0,namebytelen,3):
@@ -101,10 +102,15 @@ def read_index(stream):
 		name = convname(b''.join(namebuf).decode('latin1'))
 		size = stream.read(4)
 		if len(size) < 4:
-			raise IOError("unexpected end of file while reading file size")
+			raise IOError("record %d: unexpected end of file while reading file size" % i)
 		size, = struct.unpack('<I',size)
-
 		offset = stream.tell()
+
+		if packed_offset != last_packed_offset + size + namelen + 4:
+			raise IOError("record %d: offset value validation failed (%d != %d)" % (i, packed_offset, last_packed_offset + size + namelen + 4))
+
+		last_packed_offset = packed_offset
+
 		yield name, offset, size
 		next_offset = offset + size + 1
 		stream.seek(next_offset - 1, 0)
@@ -112,7 +118,7 @@ def read_index(stream):
 		if byte != b'\0':
 			raise IOError("record %d: expected zero byte at and of data, but found: %r" % (i, byte))
 		if next_offset != stream.tell():
-			raise IOError("error seeking to %u" % (offset + size))
+			raise IOError("record %d: error seeking to %u" % (i, offset + size))
 		i += 1
 
 	offset = stream.tell()

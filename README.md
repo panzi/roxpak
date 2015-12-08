@@ -1,6 +1,8 @@
 roxpak
 ======
 
+Unpack, list and mount RoX game archives. See: http://www.autofish.net/shrines/rox/
+
 Basic usage:
 
 	roxpak.py list <archive>                 - list contens of .pak archive
@@ -18,11 +20,7 @@ File Format
 Enough of the file format is reverse engineered to dump the packed files, but
 there are some fields that I don't know what they do.
 
-File names are stored in some strange way where they use 3 bytes per character
-where the first byte is always 1 and the second always 0. The third byte is the
-actual chracter in ASCII.
-
-Encoding: Little Endian
+Number encoding: Little Endian
 
 
 	┌──────────────────────────────┐
@@ -35,10 +33,11 @@ Encoding: Little Endian
 	│ │                          │ │
 	│ │ Entry                    │ │
 	│ │                          │ │
-	│ │    ???                   │ │
-	│ │    file name lenght      │ │
+	│ │    packed offset         │ │
+	│ │    file name length      │ │
+	│ │    NIL                   │ │
+	│ │    NIL                   │ │
 	│ │    file name             │ │
-	│ │    ???                   │ │
 	│ │    file size             │ │
 	│ │    file data             │ │
 	│ │    NIL                   │ │
@@ -57,14 +56,27 @@ Encoding: Little Endian
 
 ### Entry
 
+If you create an alternative archive where for each record only the size (or
+some other 32 bit value), the name as ASCII (1 byte per character, no NIL
+character) and the file data is included, then `O[i]` gives the offset for
+record `i` (`O[0] = 0` given that the first record has `i = 1`).
+
+Maybe the file data is read into memory in such a way that this value can be
+used to lookup the records?
+
+File names are stored in some strange way where they use 3 bytes per character
+where the first byte is always 1 and the second always 0 and the third byte is
+the actual chracter in ASCII. There is no terminating NIL character.
+
 	    Offset  Size  Type        Description
-	         0     4  ???         ???
-	         4     4  uint32_t    file name lenght (N)
-	         8     2  ???         always two zero bytes
-	        10     N  byte[N*3]   file name
+	         0     4  uint32_t    O[i] = O[i-1] + N + S + 4
+	         4     4  uint32_t    file name length (N)
+	         8     1  byte        always zero
+	         9     1  byte        always zero
+	        10     N  byte[N*3]   file name (no NIL byte)
 	  10+N*3+1     4  uint32_t    file size (S)
       10+N*3+5     S  uint8_t[S]  file data
-	10+N*3+5+S     1  ???         always zero
+	10+N*3+5+S     1  byte        always zero (terminator?)
 
 Related Projects
 ----------------
