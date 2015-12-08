@@ -3,8 +3,6 @@ roxpak
 
 Basic usage:
 
-Basic usage:
-
 	roxpak.py list <archive>                 - list contens of .pak archive
 	roxpak.py unpack <archive>               - extract .pak archive
 	roxpak.py mount <archive> <mount-point>  - mount archive as read-only file system
